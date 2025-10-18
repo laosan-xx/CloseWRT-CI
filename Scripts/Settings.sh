@@ -7,7 +7,7 @@ sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-m
 #添加编译日期标识
 sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" $(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js")
 #修改默认密码 tk!@1234
-# sed -i "s/root:.*/root:\$5\$qo5Jzz0K83Qdfl1P\$lmVOHAOeL6vU.YZqdzbNBIwMSPYOInwG\/u51WvHuYq7:20379:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
+sed -i "s/root:.*/root:\$5\$A8M.v2WgUaXZ8HWk\$FZEOQzw3FdwN2k9JvbG3e2er7LsjahQHqPLO0au4Vr8:20379:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
 
 # TTYD 免登录
 sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.config
