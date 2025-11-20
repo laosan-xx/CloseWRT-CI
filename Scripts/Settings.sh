@@ -27,15 +27,25 @@ CFG_FILE="./package/base-files/files/bin/config_generate"
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $CFG_FILE
 #修改默认主机名
 sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
-#禁用wan6接口
-if [ -f "$CFG_FILE" ]; then
-	#注释掉创建wan6接口的相关代码行（排除已注释的行）
-	sed -i '/^[^#]*ucidef_set_interface_wan6/s/^/#/g' $CFG_FILE
-	sed -i '/^[^#]*set_interface.*wan6/s/^/#/g' $CFG_FILE
-	sed -i '/^[^#]*wan6.*proto/s/^/#/g' $CFG_FILE
-	#注释掉其他可能创建wan6的代码行
-	sed -i '/^[^#]*wan6/s/^/#/g' $CFG_FILE
+
+#默认禁用wan6接口，首次启动时使用uci命令禁用
+UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
+WAN6_DISABLE_SCRIPT="$UCI_DEFAULTS_DIR/99-disable-wan6"
+mkdir -p "$UCI_DEFAULTS_DIR"
+cat > "$WAN6_DISABLE_SCRIPT" << 'EOF'
+#!/bin/sh
+# 禁用wan6接口
+if uci get network.wan6 >/dev/null 2>&1; then
+	uci set network.wan6.disabled='1'
+	uci commit network
+	# 重新加载网络配置以应用更改
+	/etc/init.d/network reload 2>/dev/null || true
+	echo "wan6接口已禁用"
 fi
+exit 0
+EOF
+chmod +x "$WAN6_DISABLE_SCRIPT"
+echo "已创建wan6禁用脚本: $WAN6_DISABLE_SCRIPT"
 
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
