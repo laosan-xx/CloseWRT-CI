@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#移除luci-app-attendedsysupgrade
+sed -i "/attendedsysupgrade/d" $(find ./feeds/luci/collections/ -type f -name "Makefile")
 #修改默认主题
 sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/collections/ -type f -name "Makefile")
 #修改immortalwrt.lan关联IP
@@ -25,6 +27,25 @@ CFG_FILE="./package/base-files/files/bin/config_generate"
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $CFG_FILE
 #修改默认主机名
 sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
+
+#默认禁用wan6接口，首次启动时使用uci命令禁用
+UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
+WAN6_DISABLE_SCRIPT="$UCI_DEFAULTS_DIR/99-disable-wan6"
+mkdir -p "$UCI_DEFAULTS_DIR"
+cat > "$WAN6_DISABLE_SCRIPT" << 'EOF'
+#!/bin/sh
+# 禁用wan6接口
+if uci get network.wan6 >/dev/null 2>&1; then
+	uci set network.wan6.disabled='1'
+	uci commit network
+	# 重新加载网络配置以应用更改
+	/etc/init.d/network reload 2>/dev/null || true
+	echo "wan6接口已禁用"
+fi
+exit 0
+EOF
+chmod +x "$WAN6_DISABLE_SCRIPT"
+echo "已创建wan6禁用脚本: $WAN6_DISABLE_SCRIPT"
 
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
