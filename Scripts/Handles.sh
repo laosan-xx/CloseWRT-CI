@@ -90,53 +90,25 @@ if [ -d *"homeproxy"* ]; then
 	cd $PKG_PATH && echo "homeproxy date has been updated!"
 fi
 
-# 解决wan口地址与lan口冲突
-FILES_PATH="$GITHUB_WORKSPACE/wrt/files/"
-mkdir -p $FILES_PATH/etc/hotplug.d/iface
-cat << 'EOF' > $FILES_PATH/etc/hotplug.d/iface/90-autolanip
-#!/bin/sh
-[ "$INTERFACE" = "wan" ] && [ "$ACTION" = "ifup" ] || exit 0
+#解决wan口地址与lan口冲突
+HOTPLUG_IFACE_DIR="$GITHUB_WORKSPACE/wrt/files/etc/hotplug.d/iface"
+SRC_FILE="$OTHER_PATH/90-autolanip"
+DEST_FILE="$HOTPLUG_IFACE_DIR/90-autolanip"
 
-WAN_IP="$IPADDR"
-LAN_IFACE="lan"
+mkdir -p "$HOTPLUG_IFACE_DIR" && \
+	echo "目录已就绪：$HOTPLUG_IFACE_DIR"
 
-if ! uci get network.$LAN_IFACE.proto &>/dev/null || [ "$(uci get network.$LAN_IFACE.proto)" != "static" ]; then
-    exit 0
+if [ ! -f "$SRC_FILE" ]; then
+	echo "源文件不存在: $SRC_FILE" >&2
+else
+	if cp -f "$SRC_FILE" "$DEST_FILE"; then
+		chmod +x "$DEST_FILE"
+		echo "LAN IP 冲突修复脚本添加完成：$DEST_FILE"
+	else
+		echo "脚本复制失败: $SRC_FILE → $DEST_FILE" >&2
+	fi
 fi
 
-CURRENT_LAN_IP=$(uci get network.$LAN_IFACE.ipaddr)
-WAN_PREFIX=$(echo "$WAN_IP" | cut -d. -f1-3)
-LAN_PREFIX=$(echo "$CURRENT_LAN_IP" | cut -d. -f1-3)
-
-if [ "$WAN_PREFIX" != "$LAN_PREFIX" ]; then
-    exit 0
-fi
-
-logger -t "AutoLANIP" "Conflict detected: WAN ($WAN_IP) vs LAN ($CURRENT_LAN_IP). Resolving..."
-
-ALTERNATE_OCTETS="2 3 4 5 6 7 8 9 10"
-NEW_LAN_IP=""
-for OCTET in $ALTERNATE_OCTETS; do
-    NEW_PREFIX="192.168.$OCTET"
-    if [ "$NEW_PREFIX" != "$WAN_PREFIX" ]; then
-        NEW_LAN_IP="${NEW_PREFIX}.1"
-        break
-    fi
-done
-
-if [ -n "$NEW_LAN_IP" ]; then
-    logger -t "AutoLANIP" "Changing LAN IP to $NEW_LAN_IP"
-    uci set network.$LAN_IFACE.ipaddr="$NEW_LAN_IP"
-    uci commit network
-    /etc/init.d/network restart
-fi
-exit 0
-EOF
-test -f $FILES_PATH/etc/hotplug.d/iface/90-autolanip && echo "90-autolanip文件复制成功" || echo "90-autolanip文件复制失败"
-chmod +x $FILES_PATH/etc/hotplug.d/iface/90-autolanip
-
-echo "已添加LAN IP冲突修复脚本!"	
-# --- 结束：自动 LAN IP 冲突修复脚本 ---
 
 #修改qca-nss-drv启动顺序
 NSS_DRV="../feeds/nss_packages/qca-nss-drv/files/qca-nss-drv.init"
