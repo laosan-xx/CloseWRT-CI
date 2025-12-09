@@ -98,13 +98,15 @@ jobs:
 
       - name: Clone Code
         run: |
-          git clone --depth=1 --single-branch --branch $WRT_BRANCH $WRT_REPO ./wrt/
+          git clone --depth=1 --single-branch --branch "$WRT_BRANCH" "$WRT_REPO" ./wrt/
 
+          cd ./wrt/
           if [ -n "$WRT_COMMIT" ]; then
-            cd ./wrt/ && git checkout $WRT_COMMIT && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
-          else
-            cd ./wrt/ && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+            git fetch origin "$WRT_COMMIT" --depth=1
+            git checkout --detach "$WRT_COMMIT"
           fi
+
+          echo "WRT_HASH=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
           # 如果不存在 defconfig 则直接结束工作流
           if [ ! -d "defconfig" ]; then
