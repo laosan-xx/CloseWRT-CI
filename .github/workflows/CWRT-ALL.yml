@@ -75,6 +75,8 @@ jobs:
       WRT_BRANCH: ${{matrix.REPO_INFO.BRANCH}}
       #源码名称
       WRT_SOURCE: ${{matrix.REPO_INFO.SOURCE}}
+      #源码commit
+      WRT_COMMIT: ${{matrix.REPO_INFO.COMMIT}}
       #插件调整
       WRT_PACKAGE: ${{inputs.PACKAGE}}
       #仅输出配置文件

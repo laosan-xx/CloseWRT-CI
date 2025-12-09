@@ -34,6 +34,9 @@ on:
       WRT_SOURCE:
         required: true
         type: string
+      WRT_COMMIT:
+        required: false
+        type: string
       WRT_PACKAGE:
         required: false
         type: string
@@ -53,6 +56,7 @@ env:
   WRT_REPO: ${{inputs.WRT_REPO}}
   WRT_BRANCH: ${{inputs.WRT_BRANCH}}
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
+  WRT_COMMIT: ${{inputs.WRT_COMMIT}}
   WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
 
@@ -96,7 +100,11 @@ jobs:
         run: |
           git clone --depth=1 --single-branch --branch $WRT_BRANCH $WRT_REPO ./wrt/
 
-          cd ./wrt/ && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+          if [ -n "$WRT_COMMIT" ]; then
+            cd ./wrt/ && git checkout $WRT_COMMIT && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+          else
+            cd ./wrt/ && echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+          fi
 
           # 如果不存在 defconfig 则直接结束工作流
           if [ ! -d "defconfig" ]; then
