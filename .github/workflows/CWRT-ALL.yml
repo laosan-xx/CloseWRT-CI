@@ -50,7 +50,7 @@ jobs:
         # CONFIG: [MT7981, MT7986]
         CONFIG: [MT7981]
         REPO_INFO:
-          - {SOURCE: "padavanonly/immortalwrt-mt798x-6.6", BRANCH: "openwrt-24.10-6.6", COMMIT: "67abb3e53269fab095453cb64eccb9aaa8ceba05"}
+          - {SOURCE: "padavanonly/immortalwrt-mt798x-6.6", BRANCH: "openwrt-24.10-6.6", COMMIT: ""}
 
     #调用公用编译核心WRT-CORE.yml
     uses: ./.github/workflows/WRT-CORE.yml
