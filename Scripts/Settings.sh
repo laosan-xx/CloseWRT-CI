@@ -32,11 +32,11 @@ sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 WEB_UPDATE_FILE="./target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
 sed -i '/qihoo,360t7)/i\	cudy,tr3000-v1-ubootmod|\\' $WEB_UPDATE_FILE
 
-#默认禁用wan6接口，首次启动时使用uci命令禁用
+#自定义脚本，禁用wan6接口，随机 frpc 用户名
 UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
-WAN6_DISABLE_SCRIPT="$UCI_DEFAULTS_DIR/99-disable-wan6"
+DIY_SCRIPT="$UCI_DEFAULTS_DIR/99-diy"
 mkdir -p "$UCI_DEFAULTS_DIR"
-cat > "$WAN6_DISABLE_SCRIPT" << 'EOF'
+cat > "$DIY_SCRIPT" << 'EOF'
 #!/bin/sh
 # 禁用wan6接口
 if uci get network.wan6 >/dev/null 2>&1; then
@@ -46,10 +46,20 @@ if uci get network.wan6 >/dev/null 2>&1; then
 	/etc/init.d/network reload 2>/dev/null || true
 	echo "wan6接口已禁用"
 fi
+
+# 随机 frpc 用户名
+FRPC_USER=$(cat /dev/urandom | tr -dc 'a-z' | head -c 8)
+if uci get frpc.common.user >/dev/null 2>&1; then
+	uci set frpc.common.user="$FRPC_USER"
+	uci commit frpc
+	/etc/init.d/frpc restart 2>/dev/null || true
+	echo "frpc 用户名已设置为: $FRPC_USER"
+fi
+
 exit 0
 EOF
-chmod +x "$WAN6_DISABLE_SCRIPT"
-echo "已创建wan6禁用脚本: $WAN6_DISABLE_SCRIPT"
+chmod +x "$DIY_SCRIPT"
+echo "已创建自定义脚本: $DIY_SCRIPT"
 
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
