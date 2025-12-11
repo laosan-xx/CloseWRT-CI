@@ -28,6 +28,10 @@ sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $CFG_FILE
 #修改默认主机名
 sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 
+#修复web更新
+WEB_UPDATE_FILE="./target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
+sed -i '/qihoo,360t7)/i\	cudy,tr3000-v1-ubootmod|\\' $WEB_UPDATE_FILE
+
 #默认禁用wan6接口，首次启动时使用uci命令禁用
 UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
 WAN6_DISABLE_SCRIPT="$UCI_DEFAULTS_DIR/99-disable-wan6"
