@@ -32,40 +32,30 @@ sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 WEB_UPDATE_FILE="./target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
 sed -i '/qihoo,360t7)/i\	cudy,tr3000-v1-ubootmod|\\' $WEB_UPDATE_FILE
 
-#自定义脚本，禁用wan6接口，随机 frpc 用户名
+# 自定义脚本同步（Others/uci-defaults → package/base-files/files/etc/uci-defaults）
 UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
-DIY_SCRIPT="$UCI_DEFAULTS_DIR/99-diy"
+CUSTOM_UCI_DEFAULTS="${GITHUB_WORKSPACE:+$GITHUB_WORKSPACE/Others/uci-defaults}"
+CUSTOM_UCI_DEFAULTS="${CUSTOM_UCI_DEFAULTS:-../Others/uci-defaults}"
+
 mkdir -p "$UCI_DEFAULTS_DIR"
-cat > "$DIY_SCRIPT" << 'EOF'
-#!/bin/sh
-# 禁用wan6接口
-if uci get network.wan6 >/dev/null 2>&1; then
-	uci set network.wan6.disabled='1'
-	uci commit network
-	# 重新加载网络配置以应用更改
-	/etc/init.d/network reload 2>/dev/null || true
-	echo "wan6接口已禁用"
-fi
 
-# 随机 frpc 用户名
-FRPC_USER=$(cat /dev/urandom | tr -dc 'a-z' | head -c 8)
-if uci get frpc.common.user >/dev/null 2>&1; then
-	uci set frpc.common.user="$FRPC_USER"
-	uci commit frpc
-	/etc/init.d/frpc restart 2>/dev/null || true
-	echo "frpc 用户名已设置为: $FRPC_USER"
-fi
+if [ -d "$CUSTOM_UCI_DEFAULTS" ] && find "$CUSTOM_UCI_DEFAULTS" -maxdepth 1 -type f | grep -q .; then
+	while IFS= read -r FILE; do
+		BASENAME=$(basename "$FILE")
+		cp -f "$FILE" "$UCI_DEFAULTS_DIR/$BASENAME"
+		chmod +x "$UCI_DEFAULTS_DIR/$BASENAME"
+	done < <(find "$CUSTOM_UCI_DEFAULTS" -maxdepth 1 -type f)
 
-exit 0
-EOF
-chmod +x "$DIY_SCRIPT"
-echo "已创建自定义脚本: $DIY_SCRIPT"
+	echo "已同步自定义 uci-defaults 脚本到: $UCI_DEFAULTS_DIR"
+else
+	echo "未找到自定义 uci-defaults 脚本，跳过同步"
+fi
 
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
 echo "CONFIG_LUCI_LANG_zh_Hans=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
-echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
+# echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
 
 #手动调整的插件
 if [ -n "$WRT_PACKAGE" ]; then
