@@ -99,6 +99,7 @@ disable_wan6
 randomize_frpc_user
 
 # 执行 BSSID 随机化
+sleep 10
 randomize_wifi_bssid
 
 exit 0
