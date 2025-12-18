@@ -15,7 +15,7 @@ if [ -f "$FRPC_CONFIG_FILE" ]; then
 	RANDOM_NAME=$(cat /dev/urandom | tr -dc 'a-z' | head -c 8)
 
 	sed -i '/config conf '\''common'\''/,/^$/s/option server_addr 127.0.0.1/option server_addr frp.2026178.xyz/' $FRPC_CONFIG_FILE
-	sed -i '/config conf '\''common'\''/,/^$/s/option server_port 7000/option server_port 5443/' $FRPC_CONFIG_FILE
+	sed -i '/config conf '\''common'\''/,/^$/s/option server_port 7000/option server_port 5444/' $FRPC_CONFIG_FILE
 	sed -i '/option server_port/a\\toption token TiZTjCmJ9ZwCCiMy' $FRPC_CONFIG_FILE
 	sed -i '/option token/a\\toption user '"$RANDOM_NAME"'' $FRPC_CONFIG_FILE
 	sed -i '/option user/a\\toption login_fail_exit false' $FRPC_CONFIG_FILE
