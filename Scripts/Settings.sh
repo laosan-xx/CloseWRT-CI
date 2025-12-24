@@ -8,6 +8,8 @@ sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/coll
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
 #添加编译日期标识
 sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" $(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js")
+#修改默认密码 tk!@1234
+sed -i "s/root:.*/root:\$5\$A8M.v2WgUaXZ8HWk\$FZEOQzw3FdwN2k9JvbG3e2er7LsjahQHqPLO0au4Vr8:20379:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
 
 WIFI_FILE="./package/mtk/applications/mtwifi-cfg/files/mtwifi.sh"
 #修改WIFI名称
@@ -15,7 +17,7 @@ sed -i "s/ImmortalWrt/$WRT_SSID/g" $WIFI_FILE
 #修改WIFI加密
 sed -i "s/encryption=.*/encryption='psk2+ccmp'/g" $WIFI_FILE
 #修改WIFI密码
-sed -i "/set wireless.default_\${dev}.encryption='psk2+ccmp'/a \\\t\t\t\t\t\set wireless.default_\${dev}.key='$WRT_WORD'" $WIFI_FILE
+sed -i "/set wireless.default_\${dev}.encryption='psk2+ccmp'/a \\\t\t\t\t\t\set wireless.default_\${dev}.key='tk12345678'" $WIFI_FILE
 
 CFG_FILE="./package/base-files/files/bin/config_generate"
 #修改默认IP地址
