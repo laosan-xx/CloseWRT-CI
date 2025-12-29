@@ -5,7 +5,7 @@ name: CWRT-ALL
 on:
   #自动编译：早上4点
   schedule:
-    - cron: 0 18 * * *
+    - cron: 10 18 * * *
   #手动编译
   workflow_dispatch:
     inputs:
