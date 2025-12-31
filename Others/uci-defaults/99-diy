@@ -10,21 +10,9 @@ disable_wan6() {
   fi
 }
 
-# --- 2. 函数: 随机化 frpc 用户名 ---
-randomize_frpc_user() {
-  if uci -q get frpc.common.user >/dev/null; then
-    # 使用 /dev/urandom 生成随机的小写字母用户名（长度 8）
-    FRPC_USER=$(tr -dc 'a-z' </dev/urandom | head -c 8)
-    uci set frpc.common.user="$FRPC_USER"
-    uci commit frpc
-    /etc/init.d/frpc restart 2>/dev/null || true
-  fi
-}
-
 # ----------------------------------------
 # 执行主程序
 # ----------------------------------------
 disable_wan6
-randomize_frpc_user
 
 exit 0
