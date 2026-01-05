@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# 检查是否存在 ddnsto 配置文件，如果不存在则创建一个基础配置
+if [ ! -f "/etc/config/ddnsto" ]; then
+    touch /etc/config/ddnsto
+fi
+
+# 设置 DDNSTO 的索引
+uci set ddnsto.@ddnsto[0]=ddnsto
+uci set ddnsto.@ddnsto[0].index='0'
+
+# 设置 DDNSTO 的 Token
+uci set ddnsto.@ddnsto[0].token='06b6c004-670f-4174-af13-130c2a49af61'
+uci set ddnsto.@ddnsto[0].address='https://q3nth5yk.tocmcc.cn:443'
+
+# 设置 DDNSTO 的端口
+uci set ddnsto.@ddnsto[0].feat_port='3033'
+
+# 启用服务
+uci set ddnsto.@ddnsto[0].enabled='1'
+
+# 提交配置
+uci commit ddnsto
+
+# 确保服务在开机时启动（可选，通常安装包会自动处理）
+/etc/init.d/ddnsto enable
+
+exit 0
