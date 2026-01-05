@@ -163,6 +163,11 @@ jobs:
       - name: Update Feeds
         run: |
           cd ./wrt/
+          # 增加feed源,更新ddnsto
+          cat >> feeds.conf.default <<EOF
+          src-git nas https://github.com/linkease/nas-packages.git;master
+          src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main
+          EOF
 
           ./scripts/feeds update -a
           ./scripts/feeds install -a
