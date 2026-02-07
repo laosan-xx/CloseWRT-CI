@@ -150,6 +150,16 @@ jobs:
             echo "caches cleanup done!"
           fi
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Set Go Toolchain Env
+        run: |
+          echo "GOTOOLCHAIN=auto" >> $GITHUB_ENV
+
       - name: Update Feeds
         run: |
           cd ./wrt/
@@ -193,7 +203,7 @@ jobs:
         run: |
           cd ./wrt/
 
-          make -j1 V=s
+          make -j$(nproc) || make -j1 V=s
 
       - name: Machine Information
         run: |
