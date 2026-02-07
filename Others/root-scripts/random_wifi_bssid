@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# --- 随机化 Wi-Fi BSSID 脚本 ---
+# 使用方法: /root/randomize_wifi_bssid
+
+# A. 定义已知成功的 MAC 前缀对 (常量/配置)
+PREFIX_PAIR_0="80,82"
+PREFIX_PAIR_1="34,36"
+
+# B. 函数：生成 MAC 地址的后 5 个随机字节 (尾部)
+generate_random_tail() {
+    # 随机生成后续 5 个字节，格式为 XX:XX:XX:XX:XX
+    random_tail=$(
+        dd if=/dev/urandom bs=1 count=5 2>/dev/null | 
+        hexdump -v -e '/1 "%02X:"' | 
+        sed 's/:$//'
+    )
+    # 确保是大写
+    echo "$random_tail" | tr '[:lower:]' '[:upper:]'
+}
+
+randomize_wifi_bssid() {
+    # C. 确定设备名并进行 MT7981 检查
+    RADIO_2G=""
+    RADIO_5G=""
+
+    # 检查 MT7981 设备是否存在 (根据您之前的 UCI 输出)
+    if uci get wireless.MT7981_1_1 >/dev/null 2>&1; then
+        RADIO_2G="MT7981_1_1"
+        RADIO_5G="MT7981_1_2"
+        echo "--> 识别到 MediaTek MT7981 设备，执行 BSSID 随机化。"
+    else
+        echo "--> 未识别到 MT7981 设备，跳过 BSSID 随机化。"
+        return 0 # 安全退出函数
+    fi
+    
+    # D. 随机选择一对前缀 (POSIX 兼容)
+    RAND_NUM=$(expr $RANDOM % 2)
+
+    case $RAND_NUM in
+        0)
+            SELECTED_PAIR=$PREFIX_PAIR_0
+            ;;
+        1)
+            SELECTED_PAIR=$PREFIX_PAIR_1
+            ;;
+        *)
+            echo "错误：随机数选择前缀失败。"
+            return 1
+            ;;
+    esac
+
+    # E. 解析并构造 MAC 地址
+    BASE_PREFIX=$(echo $SELECTED_PAIR | cut -d',' -f1)
+    INCREMENTED_PREFIX=$(echo $SELECTED_PAIR | cut -d',' -f2)
+
+    RANDOM_TAIL=$(generate_random_tail)
+
+    MAC_2G="$BASE_PREFIX:$RANDOM_TAIL"
+    MAC_5G="$INCREMENTED_PREFIX:$RANDOM_TAIL"
+
+    echo "    2.4G MAC 设置为: $MAC_2G"
+    echo "    5G MAC 设置为: $MAC_5G"
+
+    # F. 设置 UCI 配置
+    uci set wireless.default_$RADIO_2G.macaddr=$MAC_2G
+    uci set wireless.default_$RADIO_5G.macaddr=$MAC_5G
+
+    # G. 提交并应用配置
+    uci commit wireless
+    wifi
+    echo "BSSID 配置已提交并应用。"
+}
+
+# 执行主函数
+randomize_wifi_bssid
+
+exit 0
