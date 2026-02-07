@@ -11,6 +11,9 @@ sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" $(find .
 #修改默认密码 password
 sed -i "s/root:.*/root:\$5\$MZloauSqpcvpjtZb\$NuVJ6qEGPkanc7\/986bDfZnF22V43GXfxl00hhremR4:20440:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
 
+# TTYD 免登录
+#sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.config
+
 WIFI_FILE="./package/mtk/applications/mtwifi-cfg/files/mtwifi.sh"
 #修改WIFI名称
 sed -i "s/ImmortalWrt/$WRT_SSID/g" $WIFI_FILE

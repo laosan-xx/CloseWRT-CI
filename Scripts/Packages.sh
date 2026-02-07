@@ -53,7 +53,8 @@ UPDATE_PACKAGE "kucat-config" "sirpdboy/luci-app-kucat-config" "master"
 
 UPDATE_PACKAGE "v2ray-geodata" "laosan-xx/my-v2ray-geodata" "master"
 UPDATE_PACKAGE "frp" "laosan-xx/my-frp" "main"
-UPDATE_PACKAGE "homeproxy" "VIKINGYFY/homeproxy" "main"
+# UPDATE_PACKAGE "frpc" "laosan-xx/luci-app-frpc" "main"
+UPDATE_PACKAGE "homeproxy" "laosan-xx/homeproxy" "master"
 UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
@@ -119,5 +120,7 @@ UPDATE_VERSION() {
 }
 
 #UPDATE_VERSION "软件包名" "测试版，true，可选，默认为否"
+# UPDATE_VERSION "geoview"
 UPDATE_VERSION "sing-box"
+# UPDATE_VERSION "xray-core"
 #UPDATE_VERSION "tailscale"
