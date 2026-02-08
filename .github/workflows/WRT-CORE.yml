@@ -150,16 +150,6 @@ jobs:
             echo "caches cleanup done!"
           fi
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          check-latest: true
-
-      - name: Set Go Toolchain Env
-        run: |
-          echo "GOTOOLCHAIN=auto" >> $GITHUB_ENV
-
       - name: Update Feeds
         run: |
           cd ./wrt/
@@ -168,6 +158,10 @@ jobs:
           sed -i '1i\src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' feeds.conf.default
 
           ./scripts/feeds update -a
+
+          rm -rf feeds/packages/lang/golang
+          git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+
           ./scripts/feeds install -a
 
       - name: Custom Packages
@@ -204,7 +198,7 @@ jobs:
           cd ./wrt/
 
           #make -j$(nproc) || make -j1 V=s
-          make -j1 V=s
+          make -j$(nproc)
 
       - name: Machine Information
         run: |
