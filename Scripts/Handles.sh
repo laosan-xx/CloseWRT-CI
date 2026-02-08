@@ -1,6 +1,41 @@
 #!/bin/bash
 
 PKG_PATH="$GITHUB_WORKSPACE/wrt/package/"
+OTHER_PATH="$GITHUB_WORKSPACE/Others/"
+
+#解决wan口地址与lan口冲突
+HOTPLUG_IFACE_DIR="$GITHUB_WORKSPACE/wrt/files/etc/hotplug.d/iface"
+SRC_FILE="$OTHER_PATH/90-autolanip"
+DEST_FILE="$HOTPLUG_IFACE_DIR/90-autolanip"
+
+mkdir -p "$HOTPLUG_IFACE_DIR" && \
+	echo "目录已就绪：$HOTPLUG_IFACE_DIR"
+
+if [ ! -f "$SRC_FILE" ]; then
+	echo "源文件不存在: $SRC_FILE" >&2
+else
+	if cp -f "$SRC_FILE" "$DEST_FILE"; then
+		chmod +x "$DEST_FILE"
+		echo "LAN IP 冲突修复脚本添加完成：$DEST_FILE"
+	else
+		echo "脚本复制失败: $SRC_FILE → $DEST_FILE" >&2
+	fi
+fi
+
+#如果有选ddnsto，删除ddnsto菜单栏一级菜单DDNSTO（Dev）这个菜单
+if [ -d *"luci-app-ddnsto"* ]; then
+	echo " "
+
+	sed -i '/entry({"admin", "ddnsto_dev"},/d' "./luci-app-ddnsto/luasrc/controller/ddnsto.lua"
+
+  # 删除 action_ddnsto_dev 函数
+  # 使用 sed 删除从 "function action_ddnsto_dev()" 到下一个独立的 "end" 之间的所有行
+  # 注意：这里使用 /^function action_ddnsto_dev()/,/^[[:space:]]*end[[:space:]]*$/ 匹配
+  # 但在某些 sed 版本中，需要更精确的匹配
+  sed -i '/^function action_ddnsto_dev()/,/^end$/d' "./luci-app-ddnsto/luasrc/controller/ddnsto.lua"
+
+	cd $PKG_PATH && echo "DDNSTO(Dev) has been removed!"
+fi
 
 #预置HomeProxy数据
 if [ -d *"homeproxy"* ]; then
@@ -11,7 +46,7 @@ if [ -d *"homeproxy"* ]; then
 
 	rm -rf ./$HP_PATH/resources/*
 
-	git clone -q --depth=1 --single-branch --branch "release" "https://github.com/Loyalsoldier/surge-rules.git" ./$HP_RULE/
+	git clone -q --depth=1 --single-branch --branch "release" "https://github.com/laosan-xx/surge-rules.git" ./$HP_RULE/
 	cd ./$HP_RULE/ && RES_VER=$(git log -1 --pretty=format:'%s' | grep -o "[0-9]*")
 
 	echo $RES_VER | tee china_ip4.ver china_ip6.ver china_list.ver gfw_list.ver

@@ -8,6 +8,11 @@ sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/coll
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
 #添加编译日期标识
 sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" $(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js")
+#修改默认密码 password
+sed -i "s/root:.*/root:\$5\$MZloauSqpcvpjtZb\$NuVJ6qEGPkanc7\/986bDfZnF22V43GXfxl00hhremR4:20440:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
+
+# TTYD 免登录
+#sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.config
 
 WIFI_FILE="./package/mtk/applications/mtwifi-cfg/files/mtwifi.sh"
 #修改WIFI名称
@@ -23,11 +28,53 @@ sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $CFG_FILE
 #修改默认主机名
 sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 
+#修复web更新
+WEB_UPDATE_FILE="./target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
+sed -i '/qihoo,360t7)/i\	cudy,tr3000-v1-ubootmod|\\' $WEB_UPDATE_FILE
+
+# 自定义脚本同步（Others/uci-defaults → package/base-files/files/etc/uci-defaults）
+UCI_DEFAULTS_DIR="./package/base-files/files/etc/uci-defaults"
+CUSTOM_UCI_DEFAULTS="${GITHUB_WORKSPACE:+$GITHUB_WORKSPACE/Others/uci-defaults}"
+CUSTOM_UCI_DEFAULTS="${CUSTOM_UCI_DEFAULTS:-../Others/uci-defaults}"
+
+mkdir -p "$UCI_DEFAULTS_DIR"
+
+if [ -d "$CUSTOM_UCI_DEFAULTS" ] && find "$CUSTOM_UCI_DEFAULTS" -maxdepth 1 -type f | grep -q .; then
+	while IFS= read -r FILE; do
+		BASENAME=$(basename "$FILE")
+		cp -f "$FILE" "$UCI_DEFAULTS_DIR/$BASENAME"
+		chmod +x "$UCI_DEFAULTS_DIR/$BASENAME"
+	done < <(find "$CUSTOM_UCI_DEFAULTS" -maxdepth 1 -type f)
+
+	echo "已同步自定义 uci-defaults 脚本到: $UCI_DEFAULTS_DIR"
+else
+	echo "未找到自定义 uci-defaults 脚本，跳过同步"
+fi
+
+# 自定义 root 脚本同步（Others/root-scripts → package/base-files/files/root）
+ROOT_SCRIPTS_DIR="./package/base-files/files/root"
+CUSTOM_ROOT_SCRIPTS="${GITHUB_WORKSPACE:+$GITHUB_WORKSPACE/Others/root-scripts}"
+CUSTOM_ROOT_SCRIPTS="${CUSTOM_ROOT_SCRIPTS:-../Others/root-scripts}"
+
+mkdir -p "$ROOT_SCRIPTS_DIR"
+
+if [ -d "$CUSTOM_ROOT_SCRIPTS" ] && find "$CUSTOM_ROOT_SCRIPTS" -maxdepth 1 -type f | grep -q .; then
+	while IFS= read -r FILE; do
+		BASENAME=$(basename "$FILE")
+		cp -f "$FILE" "$ROOT_SCRIPTS_DIR/$BASENAME"
+		chmod +x "$ROOT_SCRIPTS_DIR/$BASENAME"
+	done < <(find "$CUSTOM_ROOT_SCRIPTS" -maxdepth 1 -type f)
+
+	echo "已同步自定义 root 脚本到: $ROOT_SCRIPTS_DIR"
+else
+	echo "未找到自定义 root 脚本，跳过同步"
+fi
+
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
 echo "CONFIG_LUCI_LANG_zh_Hans=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
-echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
+# echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
 
 #手动调整的插件
 if [ -n "$WRT_PACKAGE" ]; then
