@@ -229,6 +229,7 @@ jobs:
 
           # 下载 passwall 界面（从 passwall_luci）
           fetch_ipk "passwall_luci" "luci-app-passwall"
+          fetch_ipk "passwall_luci" "luci-i18n-passwall-zh-cn"
 
           # 如需更多组件可取消注释：
           fetch_ipk "passwall_packages" "chinadns-ng"
