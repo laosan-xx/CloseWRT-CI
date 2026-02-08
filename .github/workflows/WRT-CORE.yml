@@ -192,13 +192,78 @@ jobs:
 
           make download -j$(nproc)
 
+      - name: Download Passwall Prebuilt Packages
+        if: env.WRT_TEST != 'true'
+        run: |
+          cd ./wrt/
+
+          ARCH="aarch64_cortex-a53"
+          SF_URL="https://sourceforge.net/projects/openwrt-passwall-build/files/releases/packages-24.10/${ARCH}"
+          IPK_DIR="./files/root/passwall-ipk"
+          mkdir -p ${IPK_DIR}
+
+          # 从指定 feed 下载 Packages.gz 索引并解析出 ipk 文件名进行下载
+          fetch_ipk() {
+            local FEED=$1
+            local PKG=$2
+            local INDEX="/tmp/${FEED}_Packages"
+
+            if [ ! -f "${INDEX}" ]; then
+              curl -sL "${SF_URL}/${FEED}/Packages.gz/download" | gzip -d > "${INDEX}" 2>/dev/null
+            fi
+
+            local FILENAME=$(awk "/^Package: ${PKG}$/,/^$/" "${INDEX}" | grep "^Filename:" | head -1 | awk '{print $2}')
+            if [ -n "$FILENAME" ]; then
+              local IPK_FILE=$(basename "$FILENAME")
+              echo "Downloading: ${FEED}/${IPK_FILE}"
+              curl -sL "${SF_URL}/${FEED}/${IPK_FILE}/download" -o "${IPK_DIR}/${IPK_FILE}"
+            else
+              echo "Warning: ${PKG} not found in ${FEED}"
+            fi
+          }
+
+          # 下载核心代理组件（从 passwall_packages）
+          fetch_ipk "passwall_packages" "xray-core"
+          fetch_ipk "passwall_packages" "sing-box"
+          fetch_ipk "passwall_packages" "shadowsocks-rust-sslocal"
+
+          # 下载 passwall 界面（从 passwall_luci）
+          fetch_ipk "passwall_luci" "luci-app-passwall"
+
+          # 如需更多组件可取消注释：
+          fetch_ipk "passwall_packages" "chinadns-ng"
+          fetch_ipk "passwall_packages" "dns2socks"
+          fetch_ipk "passwall_packages" "ipt2socks"
+          fetch_ipk "passwall_packages" "microsocks"
+          fetch_ipk "passwall_packages" "dns2tcp"
+          fetch_ipk "passwall_packages" "geoview"
+          fetch_ipk "passwall_packages" "v2ray-geoip"
+          fetch_ipk "passwall_packages" "v2ray-geosite"
+          fetch_ipk "passwall_packages" "tcping"
+          # fetch_ipk "passwall_packages" "shadowsocks-rust-ssserver"
+          # fetch_ipk "passwall2" "luci-app-passwall2"
+
+          echo "=== Downloaded ipk files ==="
+          ls -lh ${IPK_DIR}/
+
+          # 创建首次启动自动安装脚本
+          mkdir -p ./files/etc/uci-defaults/
+          cat > ./files/etc/uci-defaults/99-install-passwall << 'EOF'
+          #!/bin/sh
+          if [ -d "/root/passwall-ipk" ]; then
+            opkg install /root/passwall-ipk/*.ipk --force-depends 2>/dev/null
+            rm -rf /root/passwall-ipk
+          fi
+          exit 0
+          EOF
+          chmod +x ./files/etc/uci-defaults/99-install-passwall
+
       - name: Compile Firmware
         if: env.WRT_TEST != 'true'
         run: |
           cd ./wrt/
 
-          #make -j$(nproc) || make -j1 V=s
-          make -j$(nproc)
+          make -j$(nproc) || make -j1 V=s
 
       - name: Machine Information
         run: |
