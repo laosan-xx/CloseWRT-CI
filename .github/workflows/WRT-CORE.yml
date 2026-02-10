@@ -154,13 +154,13 @@ jobs:
         run: |
           cd ./wrt/
 
-          #sed -i '1i\src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' feeds.conf.default
-          #sed -i '1i\src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' feeds.conf.default
+          sed -i '1i\src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' feeds.conf.default
+          sed -i '1i\src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' feeds.conf.default
 
           ./scripts/feeds update -a
 
-          #rm -rf feeds/packages/lang/golang
-          #git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+          rm -rf feeds/packages/lang/golang
+          git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 25.x feeds/packages/lang/golang
 
           ./scripts/feeds install -a
 
@@ -192,99 +192,135 @@ jobs:
 
           make download -j$(nproc)
 
-      - name: Download Passwall Prebuilt Packages
-        if: env.WRT_TEST != 'true'
+      - name: Remove Shadowsocks and Rust components
         run: |
           cd ./wrt/
 
-          ARCH="aarch64_cortex-a53"
-          SF_PATH="releases/packages-24.10/${ARCH}"
-          SF_DL="https://sourceforge.net/projects/openwrt-passwall-build/files/${SF_PATH}"
-          IPK_TMP="/tmp/passwall-ipk"
-          mkdir -p ${IPK_TMP} ./files
+          # 1. 彻底关闭 PassWall 内的组件开关
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Server is not set/' .config
 
-          # 从指定 feed 下载 Packages.gz 索引并解析出 ipk 文件名进行下载
-          fetch_ipk() {
-            local FEED=$1
-            local PKG=$2
-            local INDEX="/tmp/${FEED}_Packages"
+          # 2. 彻底关闭底层所有相关包
+          sed -i 's/CONFIG_PACKAGE_shadowsocks-libev.*=y/# CONFIG_PACKAGE_shadowsocks-libev is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_shadowsocks-rust.*=y/# CONFIG_PACKAGE_shadowsocks-rust is not set/' .config
 
-            if [ ! -f "${INDEX}" ]; then
-              wget -qO- "${SF_DL}/${FEED}/Packages.gz/download" | gzip -d > "${INDEX}" 2>/dev/null
-            fi
+          # 3. 额外保险：强制在文件末尾注入禁用指令，防止被依赖关系反选
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-local=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-redir=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-server=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-sslocal=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssmanager=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssserver=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssservice=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssurl=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocksr-libev-ssr-redir=n" >> .config
 
-            local FILENAME=$(awk "/^Package: ${PKG}$/,/^$/" "${INDEX}" | grep "^Filename:" | head -1 | awk '{print $2}')
-            if [ -n "$FILENAME" ]; then
-              local IPK_FILE=$(basename "$FILENAME")
-              echo "Downloading: ${FEED}/${IPK_FILE}"
-              wget -qO "${IPK_TMP}/${IPK_FILE}" "${SF_DL}/${FEED}/${IPK_FILE}/download"
+          # 最后应用配置
+          make defconfig -j$(nproc)
 
-              # 校验下载的文件是否为有效 ipk（ar 格式或 gzip/tar 格式）
-              if file "${IPK_TMP}/${IPK_FILE}" 2>/dev/null | grep -qE 'ar archive|gzip'; then
-                echo "OK: ${IPK_FILE} ($(du -h "${IPK_TMP}/${IPK_FILE}" | cut -f1))"
-              else
-                echo "Error: ${IPK_FILE} download failed (not a valid ipk)"
-                file "${IPK_TMP}/${IPK_FILE}" 2>/dev/null || true
-                rm -f "${IPK_TMP}/${IPK_FILE}"
-              fi
-            else
-              echo "Warning: ${PKG} not found in ${FEED}"
-            fi
-          }
+      - name: Verify Removal
+        run: |
+          cd ./wrt/
+          grep "shadowsocks" .config || echo "Successfully removed!"
 
-          # 下载核心代理组件（从 passwall_packages）
-          fetch_ipk "passwall_packages" "xray-core"
-          fetch_ipk "passwall_packages" "sing-box"
-          fetch_ipk "passwall_packages" "shadowsocks-rust-sslocal"
+      # - name: Download Passwall Prebuilt Packages
+      #   if: env.WRT_TEST != 'true'
+      #   run: |
+      #     cd ./wrt/
 
-          # 下载 passwall 界面（从 passwall_luci）
-          fetch_ipk "passwall_luci" "luci-app-passwall"
-          fetch_ipk "passwall_luci" "luci-i18n-passwall-zh-cn"
+      #     ARCH="aarch64_cortex-a53"
+      #     SF_PATH="releases/packages-24.10/${ARCH}"
+      #     SF_DL="https://sourceforge.net/projects/openwrt-passwall-build/files/${SF_PATH}"
+      #     IPK_TMP="/tmp/passwall-ipk"
+      #     mkdir -p ${IPK_TMP} ./files
 
-          # 下载辅助组件
-          fetch_ipk "passwall_packages" "chinadns-ng"
-          fetch_ipk "passwall_packages" "dns2socks"
-          fetch_ipk "passwall_packages" "ipt2socks"
-          fetch_ipk "passwall_packages" "microsocks"
-          fetch_ipk "passwall_packages" "geoview"
-          fetch_ipk "passwall_packages" "v2ray-geoip"
-          fetch_ipk "passwall_packages" "v2ray-geosite"
-          fetch_ipk "passwall_packages" "tcping"
-          #fetch_ipk "passwall_packages" "dns2tcp"
-          # fetch_ipk "passwall_packages" "shadowsocks-rust-ssserver"
-          # fetch_ipk "passwall2" "luci-app-passwall2"
+      #     # 从指定 feed 下载 Packages.gz 索引并解析出 ipk 文件名进行下载
+      #     fetch_ipk() {
+      #       local FEED=$1
+      #       local PKG=$2
+      #       local INDEX="/tmp/${FEED}_Packages"
 
-          echo "=== Downloaded ipk files ==="
-          ls -lh ${IPK_TMP}/
+      #       if [ ! -f "${INDEX}" ]; then
+      #         wget -qO- "${SF_DL}/${FEED}/Packages.gz/download" | gzip -d > "${INDEX}" 2>/dev/null
+      #       fi
 
-          # 将 ipk 解压到 files/ 目录，直接写入固件 squashfs（不占 overlay 空间）
-          for IPK in ${IPK_TMP}/*.ipk; do
-            [ -f "$IPK" ] || continue
-            echo "Extracting: $(basename ${IPK})"
-            EXTRACT_DIR=$(mktemp -d)
+      #       local FILENAME=$(awk "/^Package: ${PKG}$/,/^$/" "${INDEX}" | grep "^Filename:" | head -1 | awk '{print $2}')
+      #       if [ -n "$FILENAME" ]; then
+      #         local IPK_FILE=$(basename "$FILENAME")
+      #         echo "Downloading: ${FEED}/${IPK_FILE}"
+      #         wget -qO "${IPK_TMP}/${IPK_FILE}" "${SF_DL}/${FEED}/${IPK_FILE}/download"
 
-            # 判断 ipk 格式：新版 (tar.gz) 或传统 (ar)
-            if file "$IPK" | grep -q 'gzip'; then
-              tar xzf "$IPK" -C ${EXTRACT_DIR}
-            else
-              cd ${EXTRACT_DIR} && ar x "$IPK" && cd -
-            fi
+      #         # 校验下载的文件是否为有效 ipk（ar 格式或 gzip/tar 格式）
+      #         if file "${IPK_TMP}/${IPK_FILE}" 2>/dev/null | grep -qE 'ar archive|gzip'; then
+      #           echo "OK: ${IPK_FILE} ($(du -h "${IPK_TMP}/${IPK_FILE}" | cut -f1))"
+      #         else
+      #           echo "Error: ${IPK_FILE} download failed (not a valid ipk)"
+      #           file "${IPK_TMP}/${IPK_FILE}" 2>/dev/null || true
+      #           rm -f "${IPK_TMP}/${IPK_FILE}"
+      #         fi
+      #       else
+      #         echo "Warning: ${PKG} not found in ${FEED}"
+      #       fi
+      #     }
 
-            # 解压 data.tar.* 到 files/
-            if [ -f ${EXTRACT_DIR}/data.tar.gz ]; then
-              tar xzf ${EXTRACT_DIR}/data.tar.gz -C ./files/
-            elif [ -f ${EXTRACT_DIR}/data.tar.xz ]; then
-              tar xJf ${EXTRACT_DIR}/data.tar.xz -C ./files/
-            elif [ -f ${EXTRACT_DIR}/data.tar.zst ]; then
-              tar --zstd -xf ${EXTRACT_DIR}/data.tar.zst -C ./files/
-            fi
+      #     # 下载核心代理组件（从 passwall_packages）
+      #     fetch_ipk "passwall_packages" "xray-core"
+      #     fetch_ipk "passwall_packages" "sing-box"
+      #     fetch_ipk "passwall_packages" "shadowsocks-rust-sslocal"
 
-            rm -rf ${EXTRACT_DIR}
-          done
+      #     # 下载 passwall 界面（从 passwall_luci）
+      #     fetch_ipk "passwall_luci" "luci-app-passwall"
+      #     fetch_ipk "passwall_luci" "luci-i18n-passwall-zh-cn"
 
-          rm -rf ${IPK_TMP}
-          echo "=== Installed to files/ ==="
-          find ./files/ -type f | head -50
+      #     # 下载辅助组件
+      #     fetch_ipk "passwall_packages" "chinadns-ng"
+      #     fetch_ipk "passwall_packages" "dns2socks"
+      #     fetch_ipk "passwall_packages" "ipt2socks"
+      #     fetch_ipk "passwall_packages" "microsocks"
+      #     fetch_ipk "passwall_packages" "geoview"
+      #     fetch_ipk "passwall_packages" "v2ray-geoip"
+      #     fetch_ipk "passwall_packages" "v2ray-geosite"
+      #     fetch_ipk "passwall_packages" "tcping"
+      #     #fetch_ipk "passwall_packages" "dns2tcp"
+      #     # fetch_ipk "passwall_packages" "shadowsocks-rust-ssserver"
+      #     # fetch_ipk "passwall2" "luci-app-passwall2"
+
+      #     echo "=== Downloaded ipk files ==="
+      #     ls -lh ${IPK_TMP}/
+
+      #     # 将 ipk 解压到 files/ 目录，直接写入固件 squashfs（不占 overlay 空间）
+      #     for IPK in ${IPK_TMP}/*.ipk; do
+      #       [ -f "$IPK" ] || continue
+      #       echo "Extracting: $(basename ${IPK})"
+      #       EXTRACT_DIR=$(mktemp -d)
+
+      #       # 判断 ipk 格式：新版 (tar.gz) 或传统 (ar)
+      #       if file "$IPK" | grep -q 'gzip'; then
+      #         tar xzf "$IPK" -C ${EXTRACT_DIR}
+      #       else
+      #         cd ${EXTRACT_DIR} && ar x "$IPK" && cd -
+      #       fi
+
+      #       # 解压 data.tar.* 到 files/
+      #       if [ -f ${EXTRACT_DIR}/data.tar.gz ]; then
+      #         tar xzf ${EXTRACT_DIR}/data.tar.gz -C ./files/
+      #       elif [ -f ${EXTRACT_DIR}/data.tar.xz ]; then
+      #         tar xJf ${EXTRACT_DIR}/data.tar.xz -C ./files/
+      #       elif [ -f ${EXTRACT_DIR}/data.tar.zst ]; then
+      #         tar --zstd -xf ${EXTRACT_DIR}/data.tar.zst -C ./files/
+      #       fi
+
+      #       rm -rf ${EXTRACT_DIR}
+      #     done
+
+      #     rm -rf ${IPK_TMP}
+      #     echo "=== Installed to files/ ==="
+      #     find ./files/ -type f | head -50
 
       - name: Compile Firmware
         if: env.WRT_TEST != 'true'
