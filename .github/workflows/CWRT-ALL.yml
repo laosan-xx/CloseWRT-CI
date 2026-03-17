@@ -35,10 +35,25 @@ jobs:
         with:
           gh_token: ${{secrets.GITHUB_TOKEN}}
           delete_releases: true
-          releases_keep_latest: 10
+          releases_keep_latest: 20
           delete_tags: true
           delete_workflows: true
           workflows_keep_day: 0
+
+  trigger-second:
+    name: Trigger Second Branch
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    steps:
+      - name: Trigger CWRT-ALL on second branch
+        run: |
+          gh workflow run CWRT-ALL.yml \
+            --ref second \
+            --field PACKAGE="${{inputs.PACKAGE}}" \
+            --field TEST="${{inputs.TEST}}"
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GH_REPO: ${{github.repository}}
 
   config:
     needs: cleanup
