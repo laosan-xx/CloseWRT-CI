@@ -6,7 +6,7 @@ name: CWRT-ALL
 
 #CI计划
 on:
-  #自动编译：早上4点
+  #自动编译：每周一早上6点
   schedule:
     - cron: 0 18 * * *
   #手动编译
@@ -68,7 +68,7 @@ jobs:
         CONFIG: [MT7981, MT7986]
         #CONFIG: [MT7981]
         REPO_INFO:
-          - {SOURCE: "padavanonly/immortalwrt-mt798x-6.6", BRANCH: "openwrt-24.10-6.6"}
+          - {SOURCE: "Yuzhii0718/immortalwrt-mt798x-6.6-padavanonly", BRANCH: "openwrt-24.10-6.6"}
 
     #调用公用编译核心WRT-CORE.yml
     uses: ./.github/workflows/WRT-CORE.yml
