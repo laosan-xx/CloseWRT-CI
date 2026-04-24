@@ -61,7 +61,7 @@ jobs:
   trigger-yanglu:
     name: Trigger Yanglu Branch
     runs-on: ubuntu-latest
-    if: github.ref_name == 'yanglu'
+    if: github.ref_name == 'main'
     steps:
       - name: Trigger CWRT-ALL on yanglu branch
         run: |
