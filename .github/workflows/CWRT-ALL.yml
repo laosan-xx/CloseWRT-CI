@@ -58,6 +58,21 @@ jobs:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GH_REPO: ${{github.repository}}
 
+  trigger-yanglu:
+    name: Trigger Yanglu Branch
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'yanglu'
+    steps:
+      - name: Trigger CWRT-ALL on yanglu branch
+        run: |
+          gh workflow run CWRT-ALL.yml \
+            --ref yanglu \
+            --field PACKAGE="${{inputs.PACKAGE}}" \
+            --field TEST="${{inputs.TEST}}"
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GH_REPO: ${{github.repository}}
+
   config:
     needs: cleanup
     name: ${{matrix.CONFIG}}
