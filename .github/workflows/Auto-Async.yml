@@ -27,5 +27,39 @@ jobs:
           git remote add upstream https://github.com/VIKINGYFY/CloseWRT-CI.git
           git fetch upstream
           git checkout main
-          git merge --no-edit upstream/main
+
+          # 备份本地 CONFIG_TARGET_DEVICE=y 的设备列表（用于特殊文件合并后还原）
+          for cfgfile in Config/MT7981.txt Config/MT7986.txt; do
+            if [ -f "$cfgfile" ]; then
+              grep '^CONFIG_TARGET_DEVICE.*=y$' "$cfgfile" > "${cfgfile}.y_bak" || true
+            fi
+          done
+
+          # 合并上游，冲突时优先采用传入的更改（先不提交，等特殊文件处理完一起提交）
+          git merge -X theirs --no-commit --no-edit upstream/main || {
+            # 如果仍有未解决的冲突（极端情况），强制采用上游版本
+            git diff --name-only --diff-filter=U | xargs git checkout --theirs --
+            git add -A
+          }
+
+          # 对 MT7981.txt / MT7986.txt 特殊处理：
+          # 上游所有 CONFIG_TARGET_DEVICE 默认为 y，只需保留自己之前选定为 y 的设备，其余改为 n
+          for cfgfile in Config/MT7981.txt Config/MT7986.txt; do
+            if [ -f "${cfgfile}.y_bak" ] && [ -s "${cfgfile}.y_bak" ]; then
+              # 先将所有 CONFIG_TARGET_DEVICE=...=y 改为 =n
+              sed -i 's|^\(CONFIG_TARGET_DEVICE.*\)=y$|\1=n|' "$cfgfile"
+              # 再将之前备份的 y 设备还原为 y
+              while IFS= read -r y_line; do
+                key=$(echo "$y_line" | sed 's/=y$//')
+                if grep -q "^${key}=n$" "$cfgfile"; then
+                  sed -i "s|^${key}=n$|${key}=y|" "$cfgfile"
+                fi
+                # 上游已删除的设备不再保留，直接跳过
+              done < "${cfgfile}.y_bak"
+              rm -f "${cfgfile}.y_bak"
+            fi
+          done
+
+          git add -A
+          git commit --no-edit
           git push origin main
