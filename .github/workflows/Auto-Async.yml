@@ -36,12 +36,19 @@ jobs:
             fi
           done
 
-          # 合并上游，冲突时优先采用传入的更改（先不提交，等特殊文件处理完一起提交）
-          git merge -X theirs --no-commit --no-edit upstream/main || {
-            # 如果仍有未解决的冲突（极端情况），强制采用上游版本
-            git diff --name-only --diff-filter=U | xargs git checkout --theirs --
-            git add -A
-          }
+          # 合并上游，如有冲突则停止并推送TG通知
+          if ! git merge --no-commit upstream/main; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U)"
+            git merge --abort
+
+            MSG="⚠️ Auto-Async 合并冲突%0A仓库: ${{ github.repository }}%0A分支: main%0A冲突文件:%0A$(echo "$CONFLICTS" | sed 's/$/%0A/g')"
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+              --data-urlencode "chat_id=${{ secrets.TG_CHAT_ID }}" \
+              --data-urlencode "text=${MSG}" > /dev/null 2>&1
+
+            echo "::error::合并上游出现冲突，已中止并推送TG通知"
+            exit 1
+          fi
 
           # 对 MT7981.txt / MT7986.txt 特殊处理：
           # 上游所有 CONFIG_TARGET_DEVICE 默认为 y，只需保留自己之前选定为 y 的设备，其余改为 n

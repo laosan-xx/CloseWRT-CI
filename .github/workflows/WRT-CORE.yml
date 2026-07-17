@@ -65,6 +65,7 @@ env:
   WRT_HASH: ""
   WRT_KVER: ""
   WRT_LIST: ""
+  WRT_REF: ${{github.ref_name}}
 
 jobs:
   core:
