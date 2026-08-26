@@ -53,27 +53,13 @@ else
 	echo "未找到自定义 uci-defaults 脚本，跳过同步"
 fi
 
-# 自定义 root 脚本同步（Others/root-scripts → package/base-files/files/root/）
-ROOT_DIR="./package/base-files/files/root"
+# 安装 tmd 到 /usr/bin/tmd（编译期从目标仓库在线下载）
 USR_BIN_DIR="./package/base-files/files/usr/bin"
-CUSTOM_ROOT_SCRIPTS="${GITHUB_WORKSPACE:+$GITHUB_WORKSPACE/Others/root-scripts}"
-CUSTOM_ROOT_SCRIPTS="${CUSTOM_ROOT_SCRIPTS:-../Others/root-scripts}"
-
-if [ -d "$CUSTOM_ROOT_SCRIPTS" ] && find "$CUSTOM_ROOT_SCRIPTS" -maxdepth 1 -type f | grep -q .; then
-	mkdir -p "$ROOT_DIR" "$USR_BIN_DIR"
-	while IFS= read -r FILE; do
-		BASENAME=$(basename "$FILE")
-		# 脚本本体放到 /root（可写分区，方便修改）
-		cp -f "$FILE" "$ROOT_DIR/$BASENAME"
-		chmod +x "$ROOT_DIR/$BASENAME"
-		# /usr/bin 下创建符号链接，实现全局命令
-		ln -sf "/root/$BASENAME" "$USR_BIN_DIR/$BASENAME"
-	done < <(find "$CUSTOM_ROOT_SCRIPTS" -maxdepth 1 -type f)
-
-	echo "已同步自定义脚本到: $ROOT_DIR，并创建全局符号链接到: $USR_BIN_DIR"
-else
-	echo "未找到自定义 root 脚本，跳过同步"
-fi
+mkdir -p "$USR_BIN_DIR"
+curl -fsSL "https://raw.githubusercontent.com/laosan-xx/diy-shell/main/wrt/tmd.sh" -o "$USR_BIN_DIR/tmd" \
+	&& chmod +x "$USR_BIN_DIR/tmd" \
+	&& echo "已安装 tmd 到系统: $USR_BIN_DIR/tmd" \
+	|| echo "错误：下载 tmd 失败，跳过安装。" >&2
 
 #配置文件修改
 echo "CONFIG_PACKAGE_luci=y" >> ./.config
