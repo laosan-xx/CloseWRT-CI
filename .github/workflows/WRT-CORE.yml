@@ -247,8 +247,8 @@ jobs:
         if: ${{ !inputs.WRT_TEST }}
         run: |
           cd ./wrt/
-          #make -j1 V=s
-          make -j$(nproc) || make -j1 V=s
+          make -j1 V=s
+          # make -j$(nproc) || make -j1 V=s
 
       - name: Check Cache Source
         id: cache-source
