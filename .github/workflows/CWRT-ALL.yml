@@ -8,7 +8,7 @@ name: CWRT-ALL
 on:
   #自动编译：每周一早上5点
   schedule:
-    - cron: 0 21 * * 0
+    - cron: 0 18 * * *
   #手动编译
   workflow_dispatch:
     inputs:
@@ -30,7 +30,43 @@ permissions: write-all
 
 #CI任务
 jobs:
+  #防重复运行：若同名工作流 CWRT-ALL 已有实例在运行，则跳过本次构建
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Check for concurrent runs
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          WORKFLOW_FILE="CWRT-ALL.yml"
+          CURRENT_RUN_ID="${{ github.run_id }}"
+
+          echo "当前运行 ID: $CURRENT_RUN_ID"
+
+          #查询同名工作流中处于 in_progress / queued 的运行（排除自身）
+          RUN_IDS="$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/runs?status=in_progress&status=queued&per_page=100" \
+            --jq '.workflow_runs[].id')"
+
+          SKIP="false"
+          while IFS= read -r RID; do
+            [ -z "$RID" ] && continue
+            [ "$RID" = "$CURRENT_RUN_ID" ] && continue
+            echo "发现同名编译任务正在运行（run id: $RID），跳过本次构建。"
+            SKIP="true"
+            break
+          done <<< "$RUN_IDS"
+
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
   cleanup:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Delete old Releases and Workflows
@@ -38,7 +74,7 @@ jobs:
         with:
           gh_token: ${{secrets.GITHUB_TOKEN}}
           delete_releases: true
-          releases_keep_latest: 0
+          releases_keep_latest: 15
           delete_tags: true
           delete_workflows: true
           workflows_keep_day: 0
@@ -63,15 +99,15 @@ jobs:
       #默认主题
       WRT_THEME: aurora
       #默认主机名
-      WRT_NAME: CWRT
+      WRT_NAME: TK-WRT
       #默认WIFI名称
-      WRT_SSID: CWRT
+      WRT_SSID: TK-WRT
       #默认WIFI密码
-      WRT_WORD: 12345678
+      WRT_WORD: tk12345678
       #默认地址
-      WRT_IP: 192.168.10.1
+      WRT_IP: 192.168.99.1
       #默认密码，仅作提示，修改无用
-      WRT_PW: 无
+      WRT_PW: xxxx
       #源码链接
       WRT_REPO: https://github.com/${{matrix.REPO_INFO.SOURCE}}.git
       #源码分支

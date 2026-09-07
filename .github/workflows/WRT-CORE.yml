@@ -67,7 +67,6 @@ jobs:
     outputs:
       cache_prefix: ${{steps.initialize-values.outputs.cache_prefix}}
       cache_key: ${{steps.clone-code.outputs.cache_key}}
-      source_hash: ${{steps.clone-code.outputs.source_hash}}
     steps:
       - name: Checkout Projects
         uses: actions/checkout@main
@@ -125,7 +124,6 @@ jobs:
           echo "WRT_HASH=$WRT_HASH" >> $GITHUB_ENV
           echo "WRT_CACHE_KEY=$WRT_CACHE_PREFIX-$WRT_HASH" >> $GITHUB_ENV
           echo "cache_key=$WRT_CACHE_PREFIX-$WRT_HASH" >> "$GITHUB_OUTPUT"
-          echo "source_hash=$WRT_HASH" >> "$GITHUB_OUTPUT"
 
           # 如果不存在 defconfig 则直接结束工作流
           if [ ! -d "defconfig" ]; then
@@ -169,7 +167,14 @@ jobs:
         run: |
           cd ./wrt/
 
+          sed -i '1i\src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' feeds.conf.default
+          sed -i '1i\src-git passwall_luci https://github.com/laosan-xx/openwrt-passwall.git;main' feeds.conf.default
+
           ./scripts/feeds update -a
+
+          rm -rf feeds/packages/lang/golang
+          git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
+
           ./scripts/feeds install -a
 
       - name: Custom Packages
@@ -200,27 +205,51 @@ jobs:
 
           make download -j$(nproc)
 
+      - name: Remove Shadowsocks and Rust components
+        run: |
+          cd ./wrt/
+
+          # 1. 彻底关闭 PassWall 内的组件开关
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Server=y/# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Server is not set/' .config
+
+          # 2. 彻底关闭底层所有相关包
+          sed -i 's/CONFIG_PACKAGE_shadowsocks-libev.*=y/# CONFIG_PACKAGE_shadowsocks-libev is not set/' .config
+          sed -i 's/CONFIG_PACKAGE_shadowsocks-rust.*=y/# CONFIG_PACKAGE_shadowsocks-rust is not set/' .config
+
+          # 3. 额外保险：强制在文件末尾注入禁用指令，防止被依赖关系反选
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-local=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-redir=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-libev-ss-server=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-sslocal=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssmanager=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssserver=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssservice=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-rust-ssurl=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=n" >> .config
+          echo "CONFIG_PACKAGE_shadowsocksr-libev-ssr-redir=n" >> .config
+
+          # 最后应用配置
+          make defconfig -j$(nproc)
+
+      - name: Verify Removal
+        run: |
+          cd ./wrt/
+          grep "shadowsocks" .config || echo "Successfully removed!"
+
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
         run: |
           cd ./wrt/
-
+          #make -j1 V=s
           make -j$(nproc) || make -j1 V=s
 
-      - name: Check Cache Source
-        id: cache-source
-        if: ${{ !inputs.WRT_TEST && success() }}
-        run: |
-          REMOTE_HASH=$(git ls-remote "$WRT_REPO" "refs/heads/$WRT_BRANCH" | awk 'NR == 1 {print $1}')
-          if [ -n "$REMOTE_HASH" ] && [ "$REMOTE_HASH" = "$WRT_HASH" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "skip cache save: source branch is now ${REMOTE_HASH:-unknown}, built $WRT_HASH"
-          fi
-
       - name: Save Build Cache
-        if: ${{ !inputs.WRT_TEST && success() && steps.cache-source.outputs.current == 'true' && steps.cache-restore.outputs.cache-hit != 'true' }}
+        if: ${{ !inputs.WRT_TEST && success() && steps.cache-restore.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@main
         with:
           key: ${{env.WRT_CACHE_KEY}}
@@ -256,7 +285,7 @@ jobs:
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
               EXT=$(basename $FILE | cut -d '.' -f 2-)
               NAME=$(basename $FILE | cut -d '.' -f 1 | grep -io "\($WRT_TARGET\).*")
-              NEW_FILE="$NAME"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_WIFI"-"$WRT_DATE"."$EXT"
+              NEW_FILE="$NAME"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_DATE"."$EXT"
               mv -f $FILE ./upload/$NEW_FILE
             done
 
@@ -268,7 +297,7 @@ jobs:
       - name: Release Firmware
         uses: softprops/action-gh-release@master
         with:
-          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
+          tag_name: ${{env.WRT_CONFIG}}-LAOSAN-${{github.ref_name}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
           body: |
             这是个平台固件包，内含多个设备！
@@ -304,32 +333,12 @@ jobs:
     env:
       GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       GH_REPO: ${{github.repository}}
-      WRT_REPO: ${{inputs.WRT_REPO}}
-      WRT_BRANCH: ${{inputs.WRT_BRANCH}}
       WRT_CACHE_PREFIX: ${{needs.core.outputs.cache_prefix}}
       WRT_CACHE_KEY: ${{needs.core.outputs.cache_key}}
-      WRT_SOURCE_HASH: ${{needs.core.outputs.source_hash}}
     steps:
       - name: Roll Build Cache
         run: |
           set -euo pipefail
-
-          delete_cache_key() {
-            local exact_key="$1"
-            gh cache list --repo "$GH_REPO" --key "$exact_key" --ref "$GITHUB_REF" --limit 100 --json id,key --jq '.[] | [.id, .key] | @tsv' |
-              while IFS=$'\t' read -r CACHE_ID CACHE_KEY; do
-                [ "$CACHE_KEY" = "$exact_key" ] || continue
-                gh cache delete "$CACHE_ID" --repo "$GH_REPO" ||
-                  echo "warning: failed to delete cache $CACHE_ID ($CACHE_KEY)"
-              done
-          }
-
-          REMOTE_HASH=$(git ls-remote "$WRT_REPO" "refs/heads/$WRT_BRANCH" | awk 'NR == 1 {print $1}')
-          if [ -z "$REMOTE_HASH" ] || [ "$REMOTE_HASH" != "$WRT_SOURCE_HASH" ]; then
-            echo "remove stale cache generation: source branch is now ${REMOTE_HASH:-unknown}, built $WRT_SOURCE_HASH"
-            delete_cache_key "$WRT_CACHE_KEY"
-            exit 0
-          fi
 
           CURRENT_CACHE_KEYS=$(gh cache list --repo "$GH_REPO" --key "$WRT_CACHE_KEY" --ref "$GITHUB_REF" --limit 100 --json key --jq '.[].key')
           CURRENT_CACHE_FOUND=0
