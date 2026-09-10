@@ -30,43 +30,7 @@ permissions: write-all
 
 #CI任务
 jobs:
-  #防重复运行：若同名工作流 CWRT-ALL 已有实例在运行，则跳过本次构建
-  guard:
-    runs-on: ubuntu-latest
-    outputs:
-      skip: ${{ steps.check.outputs.skip }}
-    steps:
-      - name: Check for concurrent runs
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          WORKFLOW_FILE="CWRT-ALL.yml"
-          CURRENT_RUN_ID="${{ github.run_id }}"
-
-          echo "当前运行 ID: $CURRENT_RUN_ID"
-
-          #查询同名工作流中处于 in_progress / queued 的运行（排除自身）
-          RUN_IDS="$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/runs?status=in_progress&status=queued&per_page=100" \
-            --jq '.workflow_runs[].id')"
-
-          SKIP="false"
-          while IFS= read -r RID; do
-            [ -z "$RID" ] && continue
-            [ "$RID" = "$CURRENT_RUN_ID" ] && continue
-            echo "发现同名编译任务正在运行（run id: $RID），跳过本次构建。"
-            SKIP="true"
-            break
-          done <<< "$RUN_IDS"
-
-          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
-
   cleanup:
-    needs: guard
-    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Delete old Releases and Workflows
