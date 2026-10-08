@@ -3,33 +3,35 @@
 # Copyright (C) 2026 VIKINGYFY
 
 #移除luci-app-attendedsysupgrade
-sed -i "/attendedsysupgrade/d" $(find ./feeds/luci/collections/ -type f -name "Makefile")
+find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "/attendedsysupgrade/d" {} +
 #修改默认主题
-sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" $(find ./feeds/luci/collections/ -type f -name "Makefile")
+find ./feeds/luci/collections/ -type f -name "Makefile" -exec sed -i "s/luci-theme-bootstrap/luci-theme-$WRT_THEME/g" {} +
 #修改immortalwrt.lan关联IP
-sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
+find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js" -exec sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" {} +
 #添加编译日期标识
-sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" $(find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js")
+find ./feeds/luci/modules/luci-mod-status/ -type f -name "10_system.js" -exec sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ $WRT_MARK-$WRT_DATE')/g" {} +
 #修改默认密码 password
 sed -i "s/root:.*/root:\$5\$MZloauSqpcvpjtZb\$NuVJ6qEGPkanc7\/986bDfZnF22V43GXfxl00hhremR4:20440:0:99999:7:::/g" $(find ./package/base-files/files/etc/ -type f -name "shadow")
 
 # TTYD 免登录
-#sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.config
+sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.config
 
 WIFI_FILE="./package/mtk/applications/mtwifi-cfg/files/mtwifi.sh"
-#修改WIFI名称（双频统一为WRT_SSID）
-sed -i "s/ImmortalWrt-\(2\.4G\|5G\)/$WRT_SSID/g" $WIFI_FILE
-#修改无线信道（源码为channel=auto，无引号；按频段分别固定，5G用149避开DFS）
-sed -i 's|set wireless\.\${dev}\.channel=auto|set wireless.${dev}.channel=${chan}|g' $WIFI_FILE
-sed -i 's|ssid="ImmortalWrt-2.4G"|ssid="ImmortalWrt-2.4G"\n\t\t\tchan="11"|g' $WIFI_FILE
-sed -i 's|ssid="ImmortalWrt-5G"|ssid="ImmortalWrt-5G"\n\t\t\tchan="149"|g' $WIFI_FILE
-sed -i 's|ssid="ImmortalWrt-6G"|ssid="ImmortalWrt-6G"\n\t\t\tchan="37"|g' $WIFI_FILE
-#5G降为80MHz（160MHz在5G必然横跨DFS信道，且部分客户端无法关联）
-sed -i 's|htmode="HE160"|htmode="HE80"|g' $WIFI_FILE
-#修改WIFI加密
-sed -i "s/encryption=.*/encryption='psk2+ccmp'/g" $WIFI_FILE
-#修改WIFI密码
-sed -i "/set wireless.default_\${dev}.encryption='psk2+ccmp'/a \\\t\t\t\t\t\set wireless.default_\${dev}.key='$WRT_WORD'" $WIFI_FILE
+if [ -f "$WIFI_FILE" ]; then
+	#修改WIFI名称（双频统一为WRT_SSID）
+	sed -i "s/ImmortalWrt-\(2\.4G\|5G\)/$WRT_SSID/g" $WIFI_FILE
+	#修改无线信道（源码为channel=auto，无引号；按频段分别固定，5G用149避开DFS）
+	sed -i 's|set wireless\.\${dev}\.channel=auto|set wireless.${dev}.channel=${chan}|g' $WIFI_FILE
+	sed -i 's|ssid="ImmortalWrt-2.4G"|ssid="ImmortalWrt-2.4G"\n\t\t\tchan="11"|g' $WIFI_FILE
+	sed -i 's|ssid="ImmortalWrt-5G"|ssid="ImmortalWrt-5G"\n\t\t\tchan="149"|g' $WIFI_FILE
+	sed -i 's|ssid="ImmortalWrt-6G"|ssid="ImmortalWrt-6G"\n\t\t\tchan="37"|g' $WIFI_FILE
+	#5G降为80MHz（160MHz在5G必然横跨DFS信道，且部分客户端无法关联）
+	sed -i 's|htmode="HE160"|htmode="HE80"|g' $WIFI_FILE
+	#修改WIFI加密
+	sed -i "s/encryption=.*/encryption='psk2+ccmp'/g" $WIFI_FILE
+	#修改WIFI密码
+	sed -i "/set wireless.default_\${dev}.encryption='psk2+ccmp'/a \\\t\t\t\t\t\set wireless.default_\${dev}.key='$WRT_WORD'" $WIFI_FILE
+fi
 
 #修复cudy TR3000(ubootmod)被写入非法BSSID
 #09-fix-mtwifi-mac从bdinfo 0xde00取MAC，该机型该偏移是组播地址(d1:fd:...)，客户端会拒绝关联
@@ -135,9 +137,4 @@ fi
 #手动调整的插件
 if [ -n "$WRT_PACKAGE" ]; then
 	echo -e "$WRT_PACKAGE" >> ./.config
-fi
-
-#无WIFI配置标志
-if [[ "${WRT_CONFIG,,}" == *"wifi"* && "${WRT_CONFIG,,}" == *"no"* ]]; then
-	echo "WRT_WIFI=wifi-no" >> $GITHUB_ENV
 fi
