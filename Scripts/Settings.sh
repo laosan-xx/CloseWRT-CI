@@ -33,6 +33,14 @@ if [ -f "$WIFI_FILE" ]; then
 	sed -i "/set wireless.default_\${dev}.encryption='psk2+ccmp'/a \\\t\t\t\t\t\set wireless.default_\${dev}.key='$WRT_WORD'" $WIFI_FILE
 fi
 
+MTWIFI_UC="./package/mtk/applications/mtwifi-cfg-ucode/files/lib/wifi/mtwifi.uc"
+if [ -f "$MTWIFI_UC" ]; then
+	#修改默认名称密码
+	sed -i "s/ImmortalWrt/$WRT_SSID/g; s/\"none\"/\"psk2+ccmp\", \"key\": \"$WRT_WORD\"/" $MTWIFI_UC
+	# 使用对应的用户态组件，避免与旧 Lua 组件同时选中。
+	printf '# CONFIG_PACKAGE_mtwifi-cfg is not set\n# CONFIG_PACKAGE_iwinfo is not set\nCONFIG_PACKAGE_mtwifi-cfg-ucode=y\n' >> .config
+fi
+
 #修复cudy TR3000(ubootmod)被写入非法BSSID
 #09-fix-mtwifi-mac从bdinfo 0xde00取MAC，该机型该偏移是组播地址(d1:fd:...)，客户端会拒绝关联
 #（表现为搜得到SSID但连不上/提示密码错误）。只摘除该机型，不影响其他cudy机型
