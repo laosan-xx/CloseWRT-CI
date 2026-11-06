@@ -19,7 +19,7 @@ sed -i 's|/bin/login|/bin/login -f root|g' feeds/packages/utils/ttyd/files/ttyd.
 WIFI_FILE="./package/mtk/applications/mtwifi-cfg/files/mtwifi.sh"
 if [ -f "$WIFI_FILE" ]; then
 	#修改WIFI名称（双频统一为WRT_SSID）
-	sed -i "s/ImmortalWrt-\(2\.4G\|5G\)/$WRT_SSID/g" $WIFI_FILE
+	sed -i "s/ImmortalWrt-\(2\.4G\|5G\|6G\)/$WRT_SSID/g" $WIFI_FILE
 	#修改无线信道（源码为channel=auto，无引号；按频段分别固定，5G用149避开DFS）
 	sed -i 's|set wireless\.\${dev}\.channel=auto|set wireless.${dev}.channel=${chan}|g' $WIFI_FILE
 	sed -i 's|ssid="ImmortalWrt-2.4G"|ssid="ImmortalWrt-2.4G"\n\t\t\tchan="11"|g' $WIFI_FILE
@@ -35,8 +35,8 @@ fi
 
 MTWIFI_UC="./package/mtk/applications/mtwifi-cfg-ucode/files/lib/wifi/mtwifi.uc"
 if [ -f "$MTWIFI_UC" ]; then
-	#修改默认名称密码
-	sed -i "s/ImmortalWrt/$WRT_SSID/g; s/\"none\"/\"psk2+ccmp\", \"key\": \"$WRT_WORD\"/" $MTWIFI_UC
+	#修改默认名称密码（先去掉上游的频段后缀，保证 2.4G/5G/6G 名称统一）
+	sed -i "s/ImmortalWrt-[0-9.]*G/$WRT_SSID/g; s/ImmortalWrt/$WRT_SSID/g; s/\"none\"/\"psk2+ccmp\", \"key\": \"$WRT_WORD\"/" $MTWIFI_UC
 	# 使用对应的用户态组件，避免与旧 Lua 组件同时选中。
 	printf '# CONFIG_PACKAGE_mtwifi-cfg is not set\n# CONFIG_PACKAGE_iwinfo is not set\nCONFIG_PACKAGE_mtwifi-cfg-ucode=y\n' >> .config
 fi
