@@ -6,9 +6,10 @@ name: CWRT-ALL
 
 #CI计划
 on:
-  #自动编译：每周一早上5点
+  #自动编译：每天早上3点25
   schedule:
-    - cron: 0 18 * * *
+    - cron: 25 3 * * *
+      timezone: "Asia/Shanghai"
   #手动编译
   workflow_dispatch:
     inputs:
@@ -38,10 +39,10 @@ jobs:
         with:
           gh_token: ${{secrets.GITHUB_TOKEN}}
           delete_releases: true
-          releases_keep_latest: 15
+          releases_keep_latest: 20
           delete_tags: true
           delete_workflows: true
-          workflows_keep_day: 0
+          workflows_keep_day: 2
 
   config:
     needs: cleanup
